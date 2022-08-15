@@ -16,9 +16,13 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
 import com.aksatoskar.ycsplassignment.R
 import com.aksatoskar.ycsplassignment.databinding.FragmentMapBinding
+import com.aksatoskar.ycsplassignment.model.Resource
 import com.aksatoskar.ycsplassignment.ui.main.viewmodel.MainViewModel
+import com.aksatoskar.ycsplassignment.util.hide
+import com.aksatoskar.ycsplassignment.util.show
 import com.aksatoskar.ycsplassignment.util.showSnackbar
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
@@ -28,9 +32,12 @@ import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.collect
+
 
 @AndroidEntryPoint
 class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListener, GoogleMap.OnCameraIdleListener {
@@ -108,7 +115,53 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
         val mapFragment = childFragmentManager.findFragmentById(R.id.map_fragment) as SupportMapFragment?
         mapFragment?.getMapAsync(this)
 
-        viewModel.fetchLocations()
+        subscribeUi()
+    }
+
+    private fun subscribeUi() {
+        lifecycleScope.launchWhenStarted {
+            viewModel.stateFlow.collect { resource ->
+                when (resource.status) {
+                    Resource.Status.SUCCESS -> {
+                        resource.data?.let { list ->
+                            list.map { locationDetails ->
+                                val position = LatLng(locationDetails.latitude, locationDetails.longitude)
+                                map?.addMarker(
+                                    MarkerOptions()
+                                        .position(position)
+                                        .title(locationDetails.propertyName)
+                                )
+
+                            }
+                        }
+                        binding.loader.hide()
+                    }
+                    Resource.Status.LOADING -> {
+                        binding.loader.show()
+                    }
+                    Resource.Status.ERROR -> {
+                        binding.loader.hide()
+                    }
+                }
+            }
+        }
+
+        lifecycleScope.launchWhenStarted {
+            viewModel.insertLocationItem.collect { result ->
+                when (result.status) {
+                    Resource.Status.SUCCESS -> {
+                        binding.loader.hide()
+                        viewModel.fetchLocations()
+                    }
+                    Resource.Status.LOADING -> {
+                        binding.loader.show()
+                    }
+                    Resource.Status.ERROR -> {
+                        binding.loader.hide()
+                    }
+                }
+            }
+        }
     }
 
     private fun submitLocation() {
@@ -267,6 +320,7 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
         this.map?.setOnCameraIdleListener(this)
         this.map?.setOnCameraMoveListener (this)
         updateLocationUI()
+        viewModel.fetchLocations()
     }
 
     companion object {
