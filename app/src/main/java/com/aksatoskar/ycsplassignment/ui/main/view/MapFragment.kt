@@ -16,7 +16,9 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.aksatoskar.ycsplassignment.R
 import com.aksatoskar.ycsplassignment.databinding.FragmentMapBinding
 import com.aksatoskar.ycsplassignment.model.Resource
@@ -37,6 +39,7 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 
 
 @AndroidEntryPoint
@@ -74,9 +77,16 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        val mapFragment = childFragmentManager.findFragmentById(R.id.map_fragment) as SupportMapFragment?
+        mapFragment?.getMapAsync(this)
+        subscribeUi()
+        setListeners()
+    }
+
+    private fun setListeners() {
         sheetBehavior = BottomSheetBehavior.from(binding.bottomSheet.bottomSheetContainer)
         sheetBehavior?.state = BottomSheetBehavior.STATE_HIDDEN
-        binding.fab.setOnClickListener { view ->
+        binding.fab.setOnClickListener {
             if (sheetBehavior?.state == BottomSheetBehavior.STATE_HIDDEN) {
                 sheetBehavior?.state = BottomSheetBehavior.STATE_EXPANDED
             } else {
@@ -104,60 +114,61 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
             }
 
             override fun onSlide(bottomSheet: View, slideOffset: Float) {
-
+                //No handling required
             }
         })
 
         binding.bottomSheet.btnProceed.setOnClickListener {
             submitLocation()
         }
-
-        val mapFragment = childFragmentManager.findFragmentById(R.id.map_fragment) as SupportMapFragment?
-        mapFragment?.getMapAsync(this)
-
-        subscribeUi()
     }
 
     private fun subscribeUi() {
-        lifecycleScope.launchWhenStarted {
-            viewModel.stateFlow.collect { resource ->
-                when (resource.status) {
-                    Resource.Status.SUCCESS -> {
-                        resource.data?.let { list ->
-                            list.map { locationDetails ->
-                                val position = LatLng(locationDetails.latitude, locationDetails.longitude)
-                                map?.addMarker(
-                                    MarkerOptions()
-                                        .position(position)
-                                        .title(locationDetails.propertyName)
-                                )
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.stateFlow.collect { resource ->
+                    when (resource.status) {
+                        Resource.Status.SUCCESS -> {
+                            resource.data?.let { list ->
+                                list.map { locationDetails ->
+                                    val position = LatLng(locationDetails.latitude, locationDetails.longitude)
+                                    map?.addMarker(
+                                        MarkerOptions()
+                                            .position(position)
+                                            .title(locationDetails.propertyName)
+                                    )
 
+                                }
                             }
+                            binding.loader.hide()
                         }
-                        binding.loader.hide()
-                    }
-                    Resource.Status.LOADING -> {
-                        binding.loader.show()
-                    }
-                    Resource.Status.ERROR -> {
-                        binding.loader.hide()
+                        Resource.Status.LOADING -> {
+                            binding.loader.show()
+                        }
+                        Resource.Status.ERROR -> {
+                            binding.loader.hide()
+                        }
                     }
                 }
             }
         }
 
-        lifecycleScope.launchWhenStarted {
-            viewModel.insertLocationItem.collect { result ->
-                when (result.status) {
-                    Resource.Status.SUCCESS -> {
-                        binding.loader.hide()
-                        viewModel.fetchLocations()
-                    }
-                    Resource.Status.LOADING -> {
-                        binding.loader.show()
-                    }
-                    Resource.Status.ERROR -> {
-                        binding.loader.hide()
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                lifecycleScope.launchWhenStarted {
+                    viewModel.insertLocationItem.collect { result ->
+                        when (result.status) {
+                            Resource.Status.SUCCESS -> {
+                                binding.loader.hide()
+                                viewModel.fetchLocations()
+                            }
+                            Resource.Status.LOADING -> {
+                                binding.loader.show()
+                            }
+                            Resource.Status.ERROR -> {
+                                binding.loader.hide()
+                            }
+                        }
                     }
                 }
             }
