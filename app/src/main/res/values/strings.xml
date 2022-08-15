@@ -1,9 +1,7 @@
 <resources>
     <string name="app_name">YCSPLAssignment</string>
     <string name="action_settings">Settings</string>
-    <!-- Strings used for fragments for navigation -->
-    <string name="first_fragment_label">First Fragment</string>
-    <string name="second_fragment_label">Second Fragment</string>
+    <string name="action_add_property">Add Property</string>
     <string name="next">Next</string>
     <string name="previous">Previous</string>
     <string name="ok">Ok</string>
@@ -15,4 +13,7 @@
 
     <string name="dialog_permission_title">Permission required</string>
     <string name="dialog_permission_default_message">Default message</string>
+    <string name="property_name">Property Name</string>
+    <string name="property_coordinates">Property Coordinates</string>
+    <string name="submit">Submit</string>
 </resources>

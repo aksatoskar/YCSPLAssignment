@@ -18,8 +18,8 @@
         android:id="@+id/loader"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:elevation="2dp"
-        android:layout_marginTop="10dp"
+        android:elevation="@dimen/loader_elevation"
+        android:layout_marginTop="@dimen/loader_spacing"
         android:layout_gravity="center|top"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -42,6 +42,7 @@
             app:layout_constraintEnd_toEndOf="parent"
             android:layout_margin="@dimen/fab_margin"
             android:layout_gravity="top"
+            android:contentDescription="@string/action_add_property"
             app:srcCompat="@drawable/ic_add" />
     </FrameLayout>
     

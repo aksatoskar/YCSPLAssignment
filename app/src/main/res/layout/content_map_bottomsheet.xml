@@ -5,7 +5,7 @@
     android:id="@+id/bottomSheetContainer"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:padding="16dp"
+    android:padding="@dimen/spacing_16dp"
     android:background="@color/white"
     app:behavior_hideable="true"
     app:layout_behavior="@string/bottom_sheet_behavior"
@@ -15,7 +15,7 @@
         android:id="@+id/tvPropertyNameHeader"
         android:layout_height="wrap_content"
         android:layout_width="wrap_content"
-        android:text="Property Name"
+        android:text="@string/property_name"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
@@ -23,19 +23,19 @@
         android:id="@+id/etPropertyName"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="10dip"
+        android:padding="@dimen/spacing_10dp"
         android:background="@drawable/rounded_edittext"
-        android:hint="Property Name"
+        android:hint="@string/property_name"
         android:inputType="text"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="@dimen/spacing_16dp"
         app:layout_constraintTop_toBottomOf="@+id/tvPropertyNameHeader" />
 
     <TextView
         android:id="@+id/tvPropertyCoordinatesHeader"
         android:layout_height="wrap_content"
         android:layout_width="wrap_content"
-        android:text="Property Coordinates"
-        android:layout_marginTop="16dp"
+        android:text="@string/property_coordinates"
+        android:layout_marginTop="@dimen/spacing_16dp"
         app:layout_constraintTop_toBottomOf="@+id/etPropertyName"
         app:layout_constraintStart_toStartOf="parent" />
 
@@ -43,18 +43,18 @@
         android:id="@+id/etPropertyCoordinates"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="10dip"
+        android:padding="@dimen/spacing_10dp"
         android:background="@drawable/rounded_edittext"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="@dimen/spacing_16dp"
         app:layout_constraintTop_toBottomOf="@+id/tvPropertyCoordinatesHeader" />
 
     <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/btnProceed"
         style="@style/primaryButton"
-        android:layout_marginTop="16dp"
-        android:layout_marginStart="36dp"
-        android:layout_marginEnd="36dp"
-        android:text="Submit"
+        android:layout_marginTop="@dimen/spacing_16dp"
+        android:layout_marginStart="@dimen/spacing_36dp"
+        android:layout_marginEnd="@dimen/spacing_36dp"
+        android:text="@string/submit"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/etPropertyCoordinates" />
