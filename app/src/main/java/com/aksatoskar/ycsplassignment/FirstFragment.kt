@@ -1,18 +1,22 @@
 package com.aksatoskar.ycsplassignment
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.constraintlayout.widget.ConstraintLayout
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.aksatoskar.ycsplassignment.databinding.FragmentFirstBinding
+import com.aksatoskar.ycsplassignment.util.showSnackbar
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -24,10 +28,6 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.snackbar.Snackbar
 
-
-/**
- * A simple [Fragment] subclass as the default destination in the navigation.
- */
 class FirstFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListener, GoogleMap.OnCameraIdleListener {
 
     private var _binding: FragmentFirstBinding? = null
@@ -39,6 +39,7 @@ class FirstFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveList
     private var lastKnownLocation: Location? = null
     private var mapCenterMarkerLatLng: LatLng? = LatLng(-33.8523341, 151.2106085)
     private var sheetBehavior: BottomSheetBehavior<ConstraintLayout>? = null
+    private var showSettingsForPermission = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -106,20 +107,76 @@ class FirstFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveList
         _binding = null
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (showSettingsForPermission) {
+            showSettingsForPermission = false
+            if (ContextCompat.checkSelfPermission(requireContext(),
+                    Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED) {
+                locationPermissionGranted()
+            } else {
+                openSettingsForPermission()
+            }
+        }
+    }
+
     private fun getLocationPermission() {
-        /*
-         * Request location permission, so that we can get the location of the
-         * device. The result of the permission request is handled by a callback,
-         * onRequestPermissionsResult.
-         */
         if (ContextCompat.checkSelfPermission(requireContext(),
                 Manifest.permission.ACCESS_FINE_LOCATION)
             == PackageManager.PERMISSION_GRANTED) {
-            locationPermissionGranted = true
+            locationPermissionGranted()
         } else {
-            ActivityCompat.requestPermissions(requireActivity(), arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
-                PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION)
+            requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
+    }
+
+    private val requestPermissionLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { isGranted: Boolean ->
+            if (isGranted) {
+                binding.incMapContent.mainContainer.showSnackbar(
+                    R.string.location_permission_granted,
+                    Snackbar.LENGTH_SHORT
+                )
+                locationPermissionGranted()
+            } else {
+                requestLocationPermission()
+            }
+        }
+
+    private fun requestLocationPermission() {
+        if (shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)) {
+            binding.incMapContent.mainContainer.showSnackbar(
+                R.string.location_access_required,
+                Snackbar.LENGTH_INDEFINITE,
+                R.string.ok
+            ) {
+                requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+        } else {
+            openSettingsForPermission()
+        }
+    }
+
+    private fun openSettingsForPermission() {
+        binding.incMapContent.mainContainer.showSnackbar(
+            R.string.location_permission_not_available,
+            Snackbar.LENGTH_INDEFINITE,
+            R.string.settings
+        ) {
+            showSettingsForPermission = true
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+            val uri = Uri.fromParts("package", requireActivity().packageName, null)
+            intent.data = uri
+            startActivity(intent)
+        }
+    }
+
+    private fun locationPermissionGranted() {
+        locationPermissionGranted = true
+        updateLocationUI()
     }
 
     private fun updateLocationUI() {
@@ -130,6 +187,7 @@ class FirstFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveList
             if (locationPermissionGranted) {
                 map?.isMyLocationEnabled = true
                 map?.uiSettings?.isMyLocationButtonEnabled = true
+                getDeviceLocation()
             } else {
                 map?.isMyLocationEnabled = false
                 map?.uiSettings?.isMyLocationButtonEnabled = false
@@ -177,9 +235,7 @@ class FirstFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveList
         this.map = googleMap
         this.map?.setOnCameraIdleListener(this)
         this.map?.setOnCameraMoveListener (this)
-        getLocationPermission()
         updateLocationUI()
-        getDeviceLocation()
     }
 
     companion object {
