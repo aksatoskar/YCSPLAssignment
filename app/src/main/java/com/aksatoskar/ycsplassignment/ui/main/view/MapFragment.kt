@@ -1,4 +1,4 @@
-package com.aksatoskar.ycsplassignment
+package com.aksatoskar.ycsplassignment.ui.main.view
 
 import android.Manifest
 import android.content.Intent
@@ -15,7 +15,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
-import com.aksatoskar.ycsplassignment.databinding.FragmentFirstBinding
+import androidx.fragment.app.viewModels
+import com.aksatoskar.ycsplassignment.R
+import com.aksatoskar.ycsplassignment.databinding.FragmentMapBinding
+import com.aksatoskar.ycsplassignment.ui.main.viewmodel.MainViewModel
 import com.aksatoskar.ycsplassignment.util.showSnackbar
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
@@ -27,10 +30,12 @@ import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.snackbar.Snackbar
+import dagger.hilt.android.AndroidEntryPoint
 
-class FirstFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListener, GoogleMap.OnCameraIdleListener {
+@AndroidEntryPoint
+class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListener, GoogleMap.OnCameraIdleListener {
 
-    private var _binding: FragmentFirstBinding? = null
+    private var _binding: FragmentMapBinding? = null
     private val binding get() = _binding!!
     private var map: GoogleMap? = null
     private var cameraPosition: CameraPosition? = null
@@ -40,6 +45,8 @@ class FirstFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveList
     private var mapCenterMarkerLatLng: LatLng? = LatLng(-33.8523341, 151.2106085)
     private var sheetBehavior: BottomSheetBehavior<ConstraintLayout>? = null
     private var showSettingsForPermission = false
+
+    private val viewModel by viewModels<MainViewModel>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,10 +61,8 @@ class FirstFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveList
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-
-        _binding = FragmentFirstBinding.inflate(inflater, container, false)
+        _binding = FragmentMapBinding.inflate(inflater, container, false)
         return binding.root
-
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -75,11 +80,19 @@ class FirstFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveList
         sheetBehavior?.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
             override fun onStateChanged(bottomSheet: View, newState: Int) {
                 if (newState == BottomSheetBehavior.STATE_HIDDEN) {
-                    binding.incMapContent.mapMarker.setImageDrawable(ContextCompat.getDrawable(requireContext(), R.drawable.ic_add))
-                    binding.fab.setImageDrawable(ContextCompat.getDrawable(requireContext(), R.drawable.ic_add))
+                    binding.incMapContent.mapMarker.setImageDrawable(ContextCompat.getDrawable(requireContext(),
+                        R.drawable.ic_add
+                    ))
+                    binding.fab.setImageDrawable(ContextCompat.getDrawable(requireContext(),
+                        R.drawable.ic_add
+                    ))
                 } else if (newState == BottomSheetBehavior.STATE_EXPANDED) {
-                    binding.incMapContent.mapMarker.setImageDrawable(ContextCompat.getDrawable(requireContext(), R.drawable.ic_marker))
-                    binding.fab.setImageDrawable(ContextCompat.getDrawable(requireContext(), R.drawable.ic_close))
+                    binding.incMapContent.mapMarker.setImageDrawable(ContextCompat.getDrawable(requireContext(),
+                        R.drawable.ic_marker
+                    ))
+                    binding.fab.setImageDrawable(ContextCompat.getDrawable(requireContext(),
+                        R.drawable.ic_close
+                    ))
                 }
             }
 
@@ -88,10 +101,28 @@ class FirstFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveList
             }
         })
 
+        binding.bottomSheet.btnProceed.setOnClickListener {
+            submitLocation()
+        }
 
         val mapFragment = childFragmentManager.findFragmentById(R.id.map_fragment) as SupportMapFragment?
         mapFragment?.getMapAsync(this)
 
+        viewModel.fetchLocations()
+    }
+
+    private fun submitLocation() {
+        val name = binding.bottomSheet.etPropertyName.text.toString()
+        if (name.isBlank()) {
+            return
+        }
+
+        mapCenterMarkerLatLng?.let {
+            viewModel.insertLocation(it, name)
+        }
+
+        binding.bottomSheet.etPropertyName.setText("")
+        sheetBehavior?.state = BottomSheetBehavior.STATE_HIDDEN
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -239,7 +270,7 @@ class FirstFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveList
     }
 
     companion object {
-        private val TAG = FirstFragment::class.java.simpleName
+        private val TAG = MapFragment::class.java.simpleName
         private const val DEFAULT_ZOOM = 15
         private const val PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1
 

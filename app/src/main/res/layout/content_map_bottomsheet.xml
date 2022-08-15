@@ -9,7 +9,7 @@
     android:background="@color/white"
     app:behavior_hideable="true"
     app:layout_behavior="@string/bottom_sheet_behavior"
-    tools:context=".FirstFragment">
+    tools:context=".ui.main.view.MapFragment">
 
     <TextView
         android:id="@+id/tvPropertyNameHeader"
