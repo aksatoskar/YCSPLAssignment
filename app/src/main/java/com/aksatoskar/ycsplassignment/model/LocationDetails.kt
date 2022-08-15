@@ -6,9 +6,9 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "LocationDetails", primaryKeys = ["latitude","longitude","propertyName"])
 data class LocationDetails (
     @NonNull
-    val latitude : String,
+    val latitude : Double,
     @NonNull
-    val longitude : String,
+    val longitude : Double,
     @NonNull
     val propertyName: String
 )

@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private var sourceRepository: ISourceRepository
@@ -35,7 +34,7 @@ class MainViewModel @Inject constructor(
     }
 
     fun insertLocation(location: LatLng, name: String) {
-        val locationDetails = LocationDetails(latitude = location.latitude.toString(), longitude = location.longitude.toString(), propertyName = name)
+        val locationDetails = LocationDetails(latitude = location.latitude, longitude = location.longitude, propertyName = name)
         viewModelScope.launch {
             sourceRepository.insertLocation(locationDetails).collect {
                 _insertLocationItem.value = it
