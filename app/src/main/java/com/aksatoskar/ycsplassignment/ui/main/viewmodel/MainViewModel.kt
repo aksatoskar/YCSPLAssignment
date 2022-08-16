@@ -5,7 +5,6 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.aksatoskar.ycsplassignment.R
 import com.aksatoskar.ycsplassignment.data.ISourceRepository
 import com.aksatoskar.ycsplassignment.model.LocationDetails
 import com.aksatoskar.ycsplassignment.model.Resource
