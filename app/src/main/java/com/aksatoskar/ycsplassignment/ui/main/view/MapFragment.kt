@@ -77,53 +77,17 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        val mapFragment = childFragmentManager.findFragmentById(R.id.map_fragment) as SupportMapFragment?
-        mapFragment?.getMapAsync(this)
-        subscribeUi()
+        initializeUI()
+        subscribeUI()
         setListeners()
     }
 
-    private fun setListeners() {
-        sheetBehavior = BottomSheetBehavior.from(binding.bottomSheet.bottomSheetContainer)
-        sheetBehavior?.state = BottomSheetBehavior.STATE_HIDDEN
-        binding.fab.setOnClickListener {
-            if (sheetBehavior?.state == BottomSheetBehavior.STATE_HIDDEN) {
-                sheetBehavior?.state = BottomSheetBehavior.STATE_EXPANDED
-            } else {
-                sheetBehavior?.state = BottomSheetBehavior.STATE_HIDDEN
-            }
-        }
-
-        sheetBehavior?.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
-            override fun onStateChanged(bottomSheet: View, newState: Int) {
-                if (newState == BottomSheetBehavior.STATE_HIDDEN) {
-                    binding.incMapContent.mapMarker.setImageDrawable(ContextCompat.getDrawable(requireContext(),
-                        R.drawable.ic_add
-                    ))
-                    binding.fab.setImageDrawable(ContextCompat.getDrawable(requireContext(),
-                        R.drawable.ic_add
-                    ))
-                } else if (newState == BottomSheetBehavior.STATE_EXPANDED) {
-                    binding.incMapContent.mapMarker.setImageDrawable(ContextCompat.getDrawable(requireContext(),
-                        R.drawable.ic_marker
-                    ))
-                    binding.fab.setImageDrawable(ContextCompat.getDrawable(requireContext(),
-                        R.drawable.ic_close
-                    ))
-                }
-            }
-
-            override fun onSlide(bottomSheet: View, slideOffset: Float) {
-                //No handling required
-            }
-        })
-
-        binding.bottomSheet.btnProceed.setOnClickListener {
-            submitLocation()
-        }
+    private fun initializeUI() {
+        val mapFragment = childFragmentManager.findFragmentById(R.id.map_fragment) as SupportMapFragment?
+        mapFragment?.getMapAsync(this)
     }
 
-    private fun subscribeUi() {
+    private fun subscribeUI() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.stateFlow.collect { resource ->
@@ -175,6 +139,54 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
         }
     }
 
+    private fun setListeners() {
+        sheetBehavior = BottomSheetBehavior.from(binding.bottomSheet.bottomSheetContainer)
+        sheetBehavior?.state = BottomSheetBehavior.STATE_HIDDEN
+        binding.fab.setOnClickListener {
+            if (sheetBehavior?.state == BottomSheetBehavior.STATE_HIDDEN) {
+                sheetBehavior?.state = BottomSheetBehavior.STATE_EXPANDED
+            } else {
+                sheetBehavior?.state = BottomSheetBehavior.STATE_HIDDEN
+            }
+        }
+
+        sheetBehavior?.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
+            override fun onStateChanged(bottomSheet: View, newState: Int) {
+                if (newState == BottomSheetBehavior.STATE_HIDDEN) {
+                    onHideBottomSheet()
+                } else if (newState == BottomSheetBehavior.STATE_EXPANDED) {
+                    onExpandBottomSheet()
+                }
+            }
+
+            override fun onSlide(bottomSheet: View, slideOffset: Float) {
+                //No handling required
+            }
+        })
+
+        binding.bottomSheet.btnProceed.setOnClickListener {
+            submitLocation()
+        }
+    }
+
+    private fun onHideBottomSheet() {
+        binding.incMapContent.mapMarker.setImageDrawable(ContextCompat.getDrawable(requireContext(),
+            R.drawable.ic_add
+        ))
+        binding.fab.setImageDrawable(ContextCompat.getDrawable(requireContext(),
+            R.drawable.ic_add
+        ))
+    }
+
+    private fun onExpandBottomSheet() {
+        binding.incMapContent.mapMarker.setImageDrawable(ContextCompat.getDrawable(requireContext(),
+            R.drawable.ic_marker
+        ))
+        binding.fab.setImageDrawable(ContextCompat.getDrawable(requireContext(),
+            R.drawable.ic_close
+        ))
+    }
+
     private fun submitLocation() {
         val name = binding.bottomSheet.etPropertyName.text.toString()
         if (name.isBlank()) {
@@ -216,6 +228,77 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
         }
     }
 
+    private fun updateLocationUI() {
+        if (map == null) {
+            return
+        }
+        try {
+            if (locationPermissionGranted) {
+                map?.isMyLocationEnabled = true
+                map?.uiSettings?.isMyLocationButtonEnabled = true
+                getDeviceLocation()
+            } else {
+                map?.isMyLocationEnabled = false
+                map?.uiSettings?.isMyLocationButtonEnabled = false
+                lastKnownLocation = null
+                getLocationPermission()
+            }
+        } catch (e: SecurityException) {
+            Log.e("Exception: %s", e.message, e)
+        }
+    }
+
+    private fun getDeviceLocation() {
+        try {
+            if (locationPermissionGranted) {
+                val locationResult = fusedLocationProviderClient.lastLocation
+                locationResult.addOnCompleteListener(requireActivity()) { task ->
+                    if (task.isSuccessful) {
+                        // Set the map's camera position to the current location of the device.
+                        lastKnownLocation = task.result
+                        if (lastKnownLocation != null) {
+                            map?.moveCamera(
+                                CameraUpdateFactory.newLatLngZoom(
+                                LatLng(lastKnownLocation!!.latitude,
+                                    lastKnownLocation!!.longitude), DEFAULT_ZOOM.toFloat()))
+                        }
+                    } else {
+                        Log.d(TAG, "Current location is null. Using defaults.")
+                        Log.e(TAG, "Exception: %s", task.exception)
+                        map?.moveCamera(CameraUpdateFactory
+                            .newLatLngZoom(mapCenterMarkerLatLng, DEFAULT_ZOOM.toFloat()))
+                        map?.uiSettings?.isMyLocationButtonEnabled = false
+                    }
+                }
+            }
+        } catch (e: SecurityException) {
+            Log.e("Exception: %s", e.message, e)
+        }
+    }
+
+    override fun onMapReady(googleMap: GoogleMap?) {
+        this.map = googleMap
+        this.map?.setOnCameraIdleListener(this)
+        this.map?.setOnCameraMoveListener (this)
+        updateLocationUI()
+        viewModel.fetchLocations()
+    }
+
+    /**
+     * Implementation of Google Map Camera listeners
+     */
+    override fun onCameraMove() {
+        //No handling required
+    }
+
+    override fun onCameraIdle() {
+        mapCenterMarkerLatLng = map?.cameraPosition?.target
+        binding.bottomSheet.etPropertyCoordinates.text = "${mapCenterMarkerLatLng?.latitude}, ${mapCenterMarkerLatLng?.longitude}"
+    }
+
+    /**
+     * Location Permission Handling
+     */
     private fun getLocationPermission() {
         if (ContextCompat.checkSelfPermission(requireContext(),
                 Manifest.permission.ACCESS_FINE_LOCATION)
@@ -274,87 +357,10 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
         updateLocationUI()
     }
 
-    private fun updateLocationUI() {
-        if (map == null) {
-            return
-        }
-        try {
-            if (locationPermissionGranted) {
-                map?.isMyLocationEnabled = true
-                map?.uiSettings?.isMyLocationButtonEnabled = true
-                getDeviceLocation()
-            } else {
-                map?.isMyLocationEnabled = false
-                map?.uiSettings?.isMyLocationButtonEnabled = false
-                lastKnownLocation = null
-                getLocationPermission()
-            }
-        } catch (e: SecurityException) {
-            Log.e("Exception: %s", e.message, e)
-        }
-    }
-
-    private fun getDeviceLocation() {
-        /*
-         * Get the best and most recent location of the device, which may be null in rare
-         * cases when a location is not available.
-         */
-        try {
-            if (locationPermissionGranted) {
-                val locationResult = fusedLocationProviderClient.lastLocation
-                locationResult.addOnCompleteListener(requireActivity()) { task ->
-                    if (task.isSuccessful) {
-                        // Set the map's camera position to the current location of the device.
-                        lastKnownLocation = task.result
-                        if (lastKnownLocation != null) {
-                            map?.moveCamera(
-                                CameraUpdateFactory.newLatLngZoom(
-                                LatLng(lastKnownLocation!!.latitude,
-                                    lastKnownLocation!!.longitude), DEFAULT_ZOOM.toFloat()))
-                        }
-                    } else {
-                        Log.d(TAG, "Current location is null. Using defaults.")
-                        Log.e(TAG, "Exception: %s", task.exception)
-                        map?.moveCamera(CameraUpdateFactory
-                            .newLatLngZoom(mapCenterMarkerLatLng, DEFAULT_ZOOM.toFloat()))
-                        map?.uiSettings?.isMyLocationButtonEnabled = false
-                    }
-                }
-            }
-        } catch (e: SecurityException) {
-            Log.e("Exception: %s", e.message, e)
-        }
-    }
-
-    override fun onMapReady(googleMap: GoogleMap?) {
-        this.map = googleMap
-        this.map?.setOnCameraIdleListener(this)
-        this.map?.setOnCameraMoveListener (this)
-        updateLocationUI()
-        viewModel.fetchLocations()
-    }
-
     companion object {
         private val TAG = MapFragment::class.java.simpleName
         private const val DEFAULT_ZOOM = 15
-        private const val PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1
-
-        // Keys for storing activity state.
-        // [START maps_current_place_state_keys]
         private const val KEY_CAMERA_POSITION = "camera_position"
         private const val KEY_LOCATION = "location"
-        // [END maps_current_place_state_keys]
-
-        // Used for selecting the current place.
-        private const val M_MAX_ENTRIES = 5
-    }
-
-    override fun onCameraMove() {
-        //No handling required
-    }
-
-    override fun onCameraIdle() {
-        mapCenterMarkerLatLng = map?.cameraPosition?.target
-        binding.bottomSheet.etPropertyCoordinates.text = "${mapCenterMarkerLatLng?.latitude}, ${mapCenterMarkerLatLng?.longitude}"
     }
 }
