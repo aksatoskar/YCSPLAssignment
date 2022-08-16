@@ -1,9 +1,10 @@
 package com.aksatoskar.ycsplassignment.ui.main.view
 
 import android.Manifest
+import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.location.Location
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
@@ -11,12 +12,15 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
+import androidx.core.content.ContextCompat.getSystemService
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.viewModels
+import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.Observer
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.aksatoskar.ycsplassignment.R
@@ -24,6 +28,7 @@ import com.aksatoskar.ycsplassignment.databinding.FragmentMapBinding
 import com.aksatoskar.ycsplassignment.model.Resource
 import com.aksatoskar.ycsplassignment.ui.main.viewmodel.MainViewModel
 import com.aksatoskar.ycsplassignment.util.hide
+import com.aksatoskar.ycsplassignment.util.isKeyboardOpen
 import com.aksatoskar.ycsplassignment.util.show
 import com.aksatoskar.ycsplassignment.util.showSnackbar
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -32,15 +37,12 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
-import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
-
 
 @AndroidEntryPoint
 class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListener, GoogleMap.OnCameraIdleListener {
@@ -48,22 +50,15 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
     private var _binding: FragmentMapBinding? = null
     private val binding get() = _binding!!
     private var map: GoogleMap? = null
-    private var cameraPosition: CameraPosition? = null
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
     private var locationPermissionGranted = false
-    private var lastKnownLocation: Location? = null
-    private var mapCenterMarkerLatLng: LatLng? = LatLng(-33.8523341, 151.2106085)
     private var sheetBehavior: BottomSheetBehavior<ConstraintLayout>? = null
     private var showSettingsForPermission = false
 
-    private val viewModel by viewModels<MainViewModel>()
+    private val viewModel by activityViewModels<MainViewModel>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (savedInstanceState != null) {
-            lastKnownLocation = savedInstanceState.getParcelable(KEY_LOCATION)
-            cameraPosition = savedInstanceState.getParcelable(KEY_CAMERA_POSITION)
-        }
         fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(requireActivity())
     }
 
@@ -82,9 +77,30 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
         setListeners()
     }
 
+    private fun setListeners() {
+        sheetBehavior?.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
+            override fun onStateChanged(bottomSheet: View, newState: Int) {
+                if (newState == BottomSheetBehavior.STATE_HIDDEN || newState == BottomSheetBehavior.STATE_EXPANDED) {
+                    viewModel.onBottomSheetStateChanged(newState)
+                }
+            }
+            override fun onSlide(bottomSheet: View, slideOffset: Float) {
+                //No handling required
+            }
+        })
+    }
+
     private fun initializeUI() {
         val mapFragment = childFragmentManager.findFragmentById(R.id.map_fragment) as SupportMapFragment?
         mapFragment?.getMapAsync(this)
+        sheetBehavior = BottomSheetBehavior.from(binding.bottomSheet.bottomSheetContainer)
+        sheetBehavior?.state = BottomSheetBehavior.STATE_HIDDEN
+        binding.bottomSheet.lifecycleOwner = this.viewLifecycleOwner
+        binding.bottomSheet.mainViewModel = viewModel
+        binding.lifecycleOwner = this.viewLifecycleOwner
+        binding.mainViewModel = viewModel
+        binding.incMapContent.lifecycleOwner = this.viewLifecycleOwner
+        binding.incMapContent.mainViewModel = viewModel
     }
 
     private fun subscribeUI() {
@@ -124,6 +140,7 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
                         when (result.status) {
                             Resource.Status.SUCCESS -> {
                                 binding.loader.hide()
+                                hideKeyboard()
                                 viewModel.fetchLocations()
                             }
                             Resource.Status.LOADING -> {
@@ -137,76 +154,35 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
                 }
             }
         }
-    }
 
-    private fun setListeners() {
-        sheetBehavior = BottomSheetBehavior.from(binding.bottomSheet.bottomSheetContainer)
-        sheetBehavior?.state = BottomSheetBehavior.STATE_HIDDEN
-        binding.fab.setOnClickListener {
-            if (sheetBehavior?.state == BottomSheetBehavior.STATE_HIDDEN) {
-                sheetBehavior?.state = BottomSheetBehavior.STATE_EXPANDED
+        viewModel.propertyName.observe(viewLifecycleOwner) { name ->
+            if (!name.isNullOrBlank()) {
+                binding.bottomSheet.tlPropertyNameHeader.helperText = ""
             } else {
-                sheetBehavior?.state = BottomSheetBehavior.STATE_HIDDEN
+                binding.bottomSheet.tlPropertyNameHeader.helperText =
+                    resources.getString(R.string.empty_property_name_validation)
             }
         }
 
-        sheetBehavior?.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
-            override fun onStateChanged(bottomSheet: View, newState: Int) {
-                if (newState == BottomSheetBehavior.STATE_HIDDEN) {
-                    onHideBottomSheet()
-                } else if (newState == BottomSheetBehavior.STATE_EXPANDED) {
-                    onExpandBottomSheet()
-                }
+        viewModel.propertyCoordinates.observe(viewLifecycleOwner) { coordinates ->
+            if (!coordinates.isNullOrBlank()) {
+                binding.bottomSheet.tlPropertyCoordinatesHeader.helperText = ""
+            } else {
+                binding.bottomSheet.tlPropertyCoordinatesHeader.helperText =
+                    resources.getString(R.string.empty_property_coordinates_validation)
             }
+        }
 
-            override fun onSlide(bottomSheet: View, slideOffset: Float) {
-                //No handling required
+        viewModel.bottomSheetState.observe(viewLifecycleOwner) { state ->
+            if (activity?.isKeyboardOpen(binding.root) == true) {
+                hideKeyboard()
+                binding.root.postDelayed({
+                    sheetBehavior?.state = state
+                }, KEYBOARD_DETECTION_DELAY)
+            } else {
+                sheetBehavior?.state = state
             }
-        })
-
-        binding.bottomSheet.btnProceed.setOnClickListener {
-            submitLocation()
         }
-    }
-
-    private fun onHideBottomSheet() {
-        binding.incMapContent.mapMarker.setImageDrawable(ContextCompat.getDrawable(requireContext(),
-            R.drawable.ic_add
-        ))
-        binding.fab.setImageDrawable(ContextCompat.getDrawable(requireContext(),
-            R.drawable.ic_add
-        ))
-    }
-
-    private fun onExpandBottomSheet() {
-        binding.incMapContent.mapMarker.setImageDrawable(ContextCompat.getDrawable(requireContext(),
-            R.drawable.ic_marker
-        ))
-        binding.fab.setImageDrawable(ContextCompat.getDrawable(requireContext(),
-            R.drawable.ic_close
-        ))
-    }
-
-    private fun submitLocation() {
-        val name = binding.bottomSheet.etPropertyName.text.toString()
-        if (name.isBlank()) {
-            return
-        }
-
-        mapCenterMarkerLatLng?.let {
-            viewModel.insertLocation(it, name)
-        }
-
-        binding.bottomSheet.etPropertyName.setText("")
-        sheetBehavior?.state = BottomSheetBehavior.STATE_HIDDEN
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        map?.let { map ->
-            outState.putParcelable(KEY_CAMERA_POSITION, map.cameraPosition)
-            outState.putParcelable(KEY_LOCATION, lastKnownLocation)
-        }
-        super.onSaveInstanceState(outState)
     }
 
     override fun onDestroyView() {
@@ -216,6 +192,8 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
 
     override fun onResume() {
         super.onResume()
+        hideKeyboard()
+        binding.loader.hide()
         if (showSettingsForPermission) {
             showSettingsForPermission = false
             if (ContextCompat.checkSelfPermission(requireContext(),
@@ -240,7 +218,7 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
             } else {
                 map?.isMyLocationEnabled = false
                 map?.uiSettings?.isMyLocationButtonEnabled = false
-                lastKnownLocation = null
+                viewModel.lastKnownLocation = null
                 getLocationPermission()
             }
         } catch (e: SecurityException) {
@@ -251,22 +229,28 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
     private fun getDeviceLocation() {
         try {
             if (locationPermissionGranted) {
+                val propertyCoordinates = viewModel.getLastKnownPropertyCoordinates()
+                if (propertyCoordinates != null) {
+                    map?.moveCamera(
+                        CameraUpdateFactory.newLatLngZoom(
+                            LatLng(propertyCoordinates.latitude,
+                                propertyCoordinates.longitude), DEFAULT_ZOOM.toFloat()))
+                    return
+                }
                 val locationResult = fusedLocationProviderClient.lastLocation
                 locationResult.addOnCompleteListener(requireActivity()) { task ->
                     if (task.isSuccessful) {
                         // Set the map's camera position to the current location of the device.
-                        lastKnownLocation = task.result
-                        if (lastKnownLocation != null) {
+                        viewModel.lastKnownLocation = task.result
+                        if (viewModel.lastKnownLocation != null) {
                             map?.moveCamera(
                                 CameraUpdateFactory.newLatLngZoom(
-                                LatLng(lastKnownLocation!!.latitude,
-                                    lastKnownLocation!!.longitude), DEFAULT_ZOOM.toFloat()))
+                                LatLng(viewModel.lastKnownLocation!!.latitude,
+                                    viewModel.lastKnownLocation!!.longitude), DEFAULT_ZOOM.toFloat()))
                         }
                     } else {
                         Log.d(TAG, "Current location is null. Using defaults.")
                         Log.e(TAG, "Exception: %s", task.exception)
-                        map?.moveCamera(CameraUpdateFactory
-                            .newLatLngZoom(mapCenterMarkerLatLng, DEFAULT_ZOOM.toFloat()))
                         map?.uiSettings?.isMyLocationButtonEnabled = false
                     }
                 }
@@ -292,8 +276,7 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
     }
 
     override fun onCameraIdle() {
-        mapCenterMarkerLatLng = map?.cameraPosition?.target
-        binding.bottomSheet.etPropertyCoordinates.text = "${mapCenterMarkerLatLng?.latitude}, ${mapCenterMarkerLatLng?.longitude}"
+        viewModel.setPropertyCoordinates(map?.cameraPosition?.target)
     }
 
     /**
@@ -346,7 +329,7 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
         ) {
             showSettingsForPermission = true
             val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-            val uri = Uri.fromParts("package", requireActivity().packageName, null)
+            val uri = Uri.fromParts(PACKAGE, requireActivity().packageName, null)
             intent.data = uri
             startActivity(intent)
         }
@@ -357,10 +340,16 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
         updateLocationUI()
     }
 
+    private fun hideKeyboard() {
+        val imm = binding.root.context?.getSystemService(Context.INPUT_METHOD_SERVICE)
+                as InputMethodManager
+        imm.hideSoftInputFromWindow(binding.root.windowToken, 0)
+    }
+
     companion object {
         private val TAG = MapFragment::class.java.simpleName
         private const val DEFAULT_ZOOM = 15
-        private const val KEY_CAMERA_POSITION = "camera_position"
-        private const val KEY_LOCATION = "location"
+        private const val KEYBOARD_DETECTION_DELAY = 100L
+        private const val PACKAGE = "package"
     }
 }

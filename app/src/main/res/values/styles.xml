@@ -7,5 +7,10 @@
         <item name="android:textSize">@dimen/primary_text_size</item>
         <item name="android:textAllCaps">false</item>
     </style>
+
+    <style name="error_appearance" parent="TextAppearance.AppCompat">
+        <item name="android:textColor">@color/error_color</item>
+        <item name="android:textSize">12sp</item>
+    </style>
 </resources>
 

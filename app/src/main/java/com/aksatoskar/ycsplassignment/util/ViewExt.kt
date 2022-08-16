@@ -1,7 +1,10 @@
 package com.aksatoskar.ycsplassignment.util
 
+import android.app.Activity
+import android.graphics.Rect
 import android.view.View
 import com.google.android.material.snackbar.Snackbar
+import kotlin.math.abs
 
 fun View.showSnackbar(msgId: Int, length: Int) {
     showSnackbar(context.getString(msgId), length)
@@ -46,6 +49,9 @@ fun View.show() {
     visibility = View.VISIBLE
 }
 
-fun View.invisible() {
-    visibility = View.INVISIBLE
+fun Activity.isKeyboardOpen(view: View): Boolean {
+    val visibleBounds = Rect()
+    view.getWindowVisibleDisplayFrame(visibleBounds)
+    // if more than 100 pixels, its probably a keyboard
+    return abs(view.rootView.height - (visibleBounds.bottom - visibleBounds.top)) > 250
 }

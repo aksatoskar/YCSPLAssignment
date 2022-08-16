@@ -16,4 +16,6 @@
     <string name="property_name">Property Name</string>
     <string name="property_coordinates">Property Coordinates</string>
     <string name="submit">Submit</string>
+    <string name="empty_property_name_validation">Property Name is required</string>
+    <string name="empty_property_coordinates_validation">Property Coordinates are required</string>
 </resources>

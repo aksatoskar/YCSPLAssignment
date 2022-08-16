@@ -8,4 +8,5 @@
     <dimen name="spacing_16dp">16dp</dimen>
     <dimen name="spacing_10dp">10dp</dimen>
     <dimen name="spacing_36dp">36dp</dimen>
+    <dimen name="spacing_8dp">8dp</dimen>
 </resources>
