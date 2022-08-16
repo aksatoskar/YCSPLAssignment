@@ -1,8 +1,10 @@
 package com.aksatoskar.ycsplassignment.util
 
 import android.app.Activity
+import android.content.Context
 import android.graphics.Rect
 import android.view.View
+import android.view.inputmethod.InputMethodManager
 import com.google.android.material.snackbar.Snackbar
 import kotlin.math.abs
 
@@ -54,4 +56,10 @@ fun Activity.isKeyboardOpen(view: View): Boolean {
     view.getWindowVisibleDisplayFrame(visibleBounds)
     // if more than 100 pixels, its probably a keyboard
     return abs(view.rootView.height - (visibleBounds.bottom - visibleBounds.top)) > 250
+}
+
+fun Activity.hideKeyboard(view: View) {
+    val imm = view.context?.getSystemService(Context.INPUT_METHOD_SERVICE)
+            as InputMethodManager
+    imm.hideSoftInputFromWindow(view.windowToken, 0)
 }

@@ -27,10 +27,7 @@ import com.aksatoskar.ycsplassignment.R
 import com.aksatoskar.ycsplassignment.databinding.FragmentMapBinding
 import com.aksatoskar.ycsplassignment.model.Resource
 import com.aksatoskar.ycsplassignment.ui.main.viewmodel.MainViewModel
-import com.aksatoskar.ycsplassignment.util.hide
-import com.aksatoskar.ycsplassignment.util.isKeyboardOpen
-import com.aksatoskar.ycsplassignment.util.show
-import com.aksatoskar.ycsplassignment.util.showSnackbar
+import com.aksatoskar.ycsplassignment.util.*
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -51,7 +48,6 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
     private val binding get() = _binding!!
     private var map: GoogleMap? = null
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
-    private var locationPermissionGranted = false
     private var sheetBehavior: BottomSheetBehavior<ConstraintLayout>? = null
     private var showSettingsForPermission = false
 
@@ -140,7 +136,7 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
                         when (result.status) {
                             Resource.Status.SUCCESS -> {
                                 binding.loader.hide()
-                                hideKeyboard()
+                                activity?.hideKeyboard(binding.root)
                                 viewModel.fetchLocations()
                             }
                             Resource.Status.LOADING -> {
@@ -175,7 +171,7 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
 
         viewModel.bottomSheetState.observe(viewLifecycleOwner) { state ->
             if (activity?.isKeyboardOpen(binding.root) == true) {
-                hideKeyboard()
+                activity?.hideKeyboard(binding.root)
                 binding.root.postDelayed({
                     sheetBehavior?.state = state
                 }, KEYBOARD_DETECTION_DELAY)
@@ -192,13 +188,11 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
 
     override fun onResume() {
         super.onResume()
-        hideKeyboard()
+        activity?.hideKeyboard(binding.root)
         binding.loader.hide()
         if (showSettingsForPermission) {
             showSettingsForPermission = false
-            if (ContextCompat.checkSelfPermission(requireContext(),
-                    Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED) {
+            if (isLocationPermissionGranted()) {
                 locationPermissionGranted()
             } else {
                 openSettingsForPermission()
@@ -211,7 +205,15 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
             return
         }
         try {
-            if (locationPermissionGranted) {
+            if (isLocationPermissionGranted()) {
+                val propertyCoordinates = viewModel.getLastKnownPropertyCoordinates()
+                if (propertyCoordinates != null && propertyCoordinates.latitude != 0.0 && propertyCoordinates.longitude != 0.0) {
+                    map?.moveCamera(
+                        CameraUpdateFactory.newLatLngZoom(
+                            LatLng(propertyCoordinates.latitude,
+                                propertyCoordinates.longitude), DEFAULT_ZOOM.toFloat()))
+                    return
+                }
                 map?.isMyLocationEnabled = true
                 map?.uiSettings?.isMyLocationButtonEnabled = true
                 getDeviceLocation()
@@ -228,15 +230,7 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
 
     private fun getDeviceLocation() {
         try {
-            if (locationPermissionGranted) {
-                val propertyCoordinates = viewModel.getLastKnownPropertyCoordinates()
-                if (propertyCoordinates != null) {
-                    map?.moveCamera(
-                        CameraUpdateFactory.newLatLngZoom(
-                            LatLng(propertyCoordinates.latitude,
-                                propertyCoordinates.longitude), DEFAULT_ZOOM.toFloat()))
-                    return
-                }
+            if (isLocationPermissionGranted()) {
                 val locationResult = fusedLocationProviderClient.lastLocation
                 locationResult.addOnCompleteListener(requireActivity()) { task ->
                     if (task.isSuccessful) {
@@ -336,14 +330,13 @@ class MapFragment : Fragment(), OnMapReadyCallback, GoogleMap.OnCameraMoveListen
     }
 
     private fun locationPermissionGranted() {
-        locationPermissionGranted = true
         updateLocationUI()
     }
 
-    private fun hideKeyboard() {
-        val imm = binding.root.context?.getSystemService(Context.INPUT_METHOD_SERVICE)
-                as InputMethodManager
-        imm.hideSoftInputFromWindow(binding.root.windowToken, 0)
+    private fun isLocationPermissionGranted(): Boolean  {
+        return (ContextCompat.checkSelfPermission(requireContext(),
+            Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED)
     }
 
     companion object {
